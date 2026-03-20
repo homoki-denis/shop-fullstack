@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./ShopApi
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      - ./ShopApi/shop.db:/app/shop.db
+
+  frontend:
+    build: ./shop-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

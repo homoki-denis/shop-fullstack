@@ -6,7 +6,7 @@ import type { Product, CartItem } from "../types";
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cart, setCart] = useState<CartItem[]>(() => {
+  const [, setCart] = useState<CartItem[]>(() => {
     const saved = localStorage.getItem("cart");
     return saved ? JSON.parse(saved) : [];
   });
