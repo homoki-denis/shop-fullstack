@@ -44,3 +44,16 @@ A fullstack e-commerce application built with ASP.NET Core and React.
 
 **Backend:**
 ```bash
+cd ShopApi
+dotnet run
+```
+
+**Frontend:**
+```bash
+cd shop-frontend
+npm install
+npm run dev
+```
+
+## Author
+Denis
