@@ -25,10 +25,14 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           python3 << 'EOF'
-          import os, json, urllib.request
+          import os, json, urllib.request, urllib.error
 
-          with open('pr_diff.txt', 'r') as f:
+          # Read diff, replacing undecodable bytes
+          with open('pr_diff.txt', 'r', encoding='utf-8', errors='replace') as f:
               diff = f.read()
+
+          # Remove null bytes which break JSON
+          diff = diff.replace('\x00', '')
 
           if not diff.strip():
               with open('comment.txt', 'w') as f:
@@ -38,39 +42,42 @@ jobs:
           if len(diff) > 15000:
               diff = diff[:15000] + "\n... (diff truncated)"
 
+          prompt = (
+              "You are a senior software engineer reviewing a pull request "
+              "for a full-stack shop app (ASP.NET Core 9 backend + React/TypeScript frontend). "
+              "Review the git diff below and give concise, actionable feedback. "
+              "Focus on: bugs, security issues, performance, and code quality. "
+              "Be constructive and specific. Format your response in Markdown.\n\n"
+              "Diff:\n```\n" + diff + "\n```"
+          )
+
           payload = {
               "model": "claude-haiku-4-5-20251001",
               "max_tokens": 1024,
-              "messages": [{
-                  "role": "user",
-                  "content": (
-                      "You are a senior software engineer reviewing a pull request "
-                      "for a full-stack shop app (ASP.NET Core 9 backend + React/TypeScript frontend). "
-                      "Review the git diff below and give concise, actionable feedback. "
-                      "Focus on: bugs, security issues, performance, and code quality. "
-                      "Be constructive and specific. Format your response in Markdown.\n\n"
-                      f"Diff:\n```\n{diff}\n```"
-                  )
-              }]
+              "messages": [{"role": "user", "content": prompt}]
           }
 
           req = urllib.request.Request(
               'https://api.anthropic.com/v1/messages',
-              data=json.dumps(payload).encode(),
+              data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
               headers={
                   'x-api-key': os.environ['ANTHROPIC_API_KEY'],
                   'anthropic-version': '2023-06-01',
-                  'content-type': 'application/json'
+                  'content-type': 'application/json; charset=utf-8'
               }
           )
 
-          with urllib.request.urlopen(req) as resp:
-              result = json.loads(resp.read())
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  result = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              print(f"API error {e.code}: {e.read().decode()}")
+              raise
 
           review = result['content'][0]['text']
-          comment = f"## Claude Code Review\n\n{review}\n\n---\n*Powered by Claude AI*"
+          comment = "## Claude Code Review\n\n" + review + "\n\n---\n*Powered by Claude AI*"
 
-          with open('comment.txt', 'w') as f:
+          with open('comment.txt', 'w', encoding='utf-8') as f:
               f.write(comment)
 
           print("Review generated successfully")
